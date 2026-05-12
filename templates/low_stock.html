@@ -1,11 +1,250 @@
 {% extends "base.html" %}
 
 {% block content %}
+
 <div class="container-fluid">
-    <div class="alert alert-warning text-center p-5">
-        <i class="fas fa-exclamation-triangle fa-3x mb-3 d-block"></i>
-        <h4>Low Stock Alerts Page</h4>
-        <p>This is a placeholder for the low stock alerts page.<br>Frontend team will implement the complete design here.</p>
+
+    <!-- header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+
+        <div>
+
+            <h2 class="fw-bold">
+                low stock alerts
+            </h2>
+
+            <p class="text-muted mb-0">
+                products below reorder level
+            </p>
+
+        </div>
+
+        <button class="btn btn-danger">
+
+            <i class="fa fa-triangle-exclamation me-2"></i>
+            alerts
+
+        </button>
+
     </div>
+
+    <!-- cards -->
+    <div class="row g-4 mb-4">
+
+        <div class="col-md-4">
+
+            <div class="card border-0 shadow-sm">
+
+                <div class="card-body">
+
+                    <div class="d-flex justify-content-between align-items-center">
+
+                        <div>
+
+                            <small class="text-muted">
+                                low stock
+                            </small>
+
+                            <h3 class="fw-bold">
+                                {{ low }}
+                            </h3>
+
+                        </div>
+
+                        <div class="bg-warning bg-opacity-10 p-3 rounded">
+
+                            <i class="fa fa-box-open text-warning"></i>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="col-md-4">
+
+            <div class="card border-0 shadow-sm">
+
+                <div class="card-body">
+
+                    <div class="d-flex justify-content-between align-items-center">
+
+                        <div>
+
+                            <small class="text-muted">
+                                out of stock
+                            </small>
+
+                            <h3 class="fw-bold">
+                                {{ out }}
+                            </h3>
+
+                        </div>
+
+                        <div class="bg-danger bg-opacity-10 p-3 rounded">
+
+                            <i class="fa fa-circle-xmark text-danger"></i>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="col-md-4">
+
+            <div class="card border-0 shadow-sm">
+
+                <div class="card-body">
+
+                    <div class="d-flex justify-content-between align-items-center">
+
+                        <div>
+
+                            <small class="text-muted">
+                                suppliers
+                            </small>
+
+                            <h3 class="fw-bold">
+                                {{ suppliers }}
+                            </h3>
+
+                        </div>
+
+                        <div class="bg-primary bg-opacity-10 p-3 rounded">
+
+                            <i class="fa fa-truck text-primary"></i>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- table -->
+    <div class="card border-0 shadow-sm">
+
+        <div class="card-body">
+
+            <div class="table-responsive">
+
+                <table class="table table-hover align-middle">
+
+                    <thead class="table-light">
+
+                        <tr>
+
+                            <th>id</th>
+                            <th>product</th>
+                            <th>category</th>
+                            <th>stock</th>
+                            <th>reorder</th>
+                            <th>supplier</th>
+                            <th>status</th>
+                            <th>actions</th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody>
+
+                        {% for product in products %}
+
+                        <tr>
+
+                            <td>
+                                {{ product.id }}
+                            </td>
+
+                            <td>
+                                {{ product.name }}
+                            </td>
+
+                            <td>
+                                {{ product.category }}
+                            </td>
+
+                            <td>
+
+                                <span class="fw-bold text-danger">
+
+                                    {{ product.stock }}
+
+                                </span>
+
+                            </td>
+
+                            <td>
+                                {{ product.reorder }}
+                            </td>
+
+                            <td>
+                                {{ product.supplier }}
+                            </td>
+
+                            <td>
+
+                                {% if product.stock == 0 %}
+
+                                <span class="badge bg-danger">
+                                    out
+                                </span>
+
+                                {% else %}
+
+                                <span class="badge bg-warning text-dark">
+                                    low
+                                </span>
+
+                                {% endif %}
+
+                            </td>
+
+                            <td>
+
+                                <div class="d-flex gap-2">
+
+                                    <button class="btn btn-sm btn-primary">
+                                        <i class="fa fa-cart-plus"></i>
+                                    </button>
+
+                                    <button class="btn btn-sm btn-outline-dark">
+                                        <i class="fa fa-eye"></i>
+                                    </button>
+
+                                </div>
+
+                            </td>
+
+                        </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </div>
+
 </div>
+
 {% endblock %}
