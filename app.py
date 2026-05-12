@@ -273,21 +273,21 @@ AUDIT_LOGS = [
 
 LOW_STOCK = [
     {'id': 2, 'name': "Lay's Chips 120g",
-     'category': 'Snacks',
-     'stock_qty': 8, 'reorder_level': 15,
-     'stock_pct': 16},
+     'category': 'Snacks', 'stock_qty': 8,
+     'reorder_level': 15, 'stock_pct': 16,
+     'supplier': 'XYZ Suppliers'},
     {'id': 3, 'name': 'Aquelle Water 1L',
-     'category': 'Beverages',
-     'stock_qty': 5, 'reorder_level': 30,
-     'stock_pct': 10},
+     'category': 'Beverages', 'stock_qty': 5,
+     'reorder_level': 30, 'stock_pct': 10,
+     'supplier': 'ABC Distributors'},
     {'id': 5, 'name': 'Ricoffy 250g',
-     'category': 'Hot Drinks',
-     'stock_qty': 3, 'reorder_level': 10,
-     'stock_pct': 6},
+     'category': 'Hot Drinks', 'stock_qty': 3,
+     'reorder_level': 10, 'stock_pct': 6,
+     'supplier': 'Fresh Supplies'},
     {'id': 8, 'name': 'Clover Full Cream Milk 1L',
-     'category': 'Dairy',
-     'stock_qty': 4, 'reorder_level': 20,
-     'stock_pct': 8},
+     'category': 'Dairy', 'stock_qty': 4,
+     'reorder_level': 20, 'stock_pct': 8,
+     'supplier': 'XYZ Suppliers'},
 ]
 
 # ═══════════════════════════════════════════════════════════
@@ -527,6 +527,11 @@ def view_sale(id):
 
 @app.route('/purchases')
 def purchases():
+    total_purchases = len(PURCHASES)
+    pending_orders = len([p for p in PURCHASES if p['status'] == 'Pending'])
+    received_orders = len([p for p in PURCHASES if p['status'] == 'Received'])
+
+
     return render_template('purchases.html',
         active          = 'purchases',
         page_title      = 'Purchases',
@@ -534,7 +539,10 @@ def purchases():
         low_stock_count = len(LOW_STOCK),
         purchases       = PURCHASES,
         suppliers       = SUPPLIERS,
-        products        = PRODUCTS
+        products        = PRODUCTS,
+        total_purchases = total_purchases,
+        pending_orders  = pending_orders,
+                received_orders = received_orders
     )
 
 @app.route('/purchases/add', methods=['POST'])
@@ -592,12 +600,17 @@ def audit_log():
 
 @app.route('/low-stock')
 def low_stock():
+    out_of_stock = len([p for p in PRODUCTS if p['stock_qty'] == 0])
+    suppliers_needed = len(set(p['supplier'] for p in LOW_STOCK))
+
     return render_template('low_stock.html',
         active          = 'lowstock',
         page_title      = 'Low Stock Alerts',
         current_date    = today(),
         low_stock_count = len(LOW_STOCK),
-        low_stock       = LOW_STOCK
+        low_stock = LOW_STOCK,
+        out_of_stock    = out_of_stock,
+        suppliers_needed = suppliers_needed 
     )
 
 # ═══════════════════════════════════════════════════════════
