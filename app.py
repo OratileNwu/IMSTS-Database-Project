@@ -384,14 +384,42 @@ def stock_chart():
 
 @app.route('/products')
 def products():
+    # Get filter parameters from URL
+    search_query = request.args.get('search', '')
+    selected_category = request.args.get('category', '')
+    
+    # Start with all products
+    filtered_products = PRODUCTS.copy()
+    
+    # Apply search filter
+    if search_query:
+        search_lower = search_query.lower()
+        filtered_products = [p for p in filtered_products 
+                            if search_lower in p['name'].lower() 
+                            or search_lower in p['sku'].lower()]
+    
+    # Apply category filter
+    if selected_category:
+        filtered_products = [p for p in filtered_products 
+                            if p['category'] == selected_category]
+    
+    # Calculate stats from filtered products
+    low_stock_items = len([p for p in filtered_products 
+                          if p['stock_qty'] <= p['reorder_level'] and p['stock_qty'] > 0])
+    categories_used = len(set([p['category'] for p in filtered_products]))
+    
     return render_template('products.html',
-        active          = 'products',
-        page_title      = 'Products',
-        current_date    = today(),
-        low_stock_count = len(LOW_STOCK),
-        products        = PRODUCTS,
-        categories      = CATEGORIES,
-        suppliers       = SUPPLIERS
+        active='products',
+        page_title='Products',
+        current_date=today(),
+        low_stock_count=len([p for p in PRODUCTS if p['stock_qty'] <= p['reorder_level']]),
+        products=filtered_products,
+        categories=CATEGORIES,
+        suppliers=SUPPLIERS,
+        low_stock_items=low_stock_items,
+        categories_used=categories_used,
+        search_query=search_query,
+        selected_category=selected_category
     )
 
 @app.route('/products/add', methods=['POST'])
@@ -404,7 +432,7 @@ def edit_product(id):
     # TODO: Replace with Oracle UPDATE when DB is ready
     return redirect('/products')
 
-@app.route('/products/delete/<int:id>')
+@app.route('/products/delete/<int:id>', methods=['POST'])
 def delete_product(id):
     # TODO: Replace with Oracle DELETE when DB is ready
     return redirect('/products')
@@ -415,12 +443,18 @@ def delete_product(id):
 
 @app.route('/categories')
 def categories():
+    main_categories = [c for c in CATEGORIES if c['parent_name'] is None]           
+    sub_categories = [c for c in CATEGORIES if c['parent_name'] is not None]    
+
+
     return render_template('categories.html',
         active          = 'categories',
         page_title      = 'Categories',
         current_date    = today(),
         low_stock_count = len(LOW_STOCK),
-        categories      = CATEGORIES
+        categories      = CATEGORIES,
+        main_categories = main_categories,
+        sub_categories  = sub_categories,
     )
 
 @app.route('/categories/add', methods=['POST'])
@@ -433,9 +467,10 @@ def edit_category(id):
     # TODO: Replace with Oracle UPDATE when DB is ready
     return redirect('/categories')
 
-@app.route('/categories/delete/<int:id>')
+@app.route('/categories/delete/<int:id>', methods=['POST'])
 def delete_category(id):
     # TODO: Replace with Oracle DELETE when DB is ready
+    flash('Category deleted successfully.', 'success')
     return redirect('/categories')
 
 # ═══════════════════════════════════════════════════════════
@@ -527,22 +562,44 @@ def view_sale(id):
 
 @app.route('/purchases')
 def purchases():
-    total_purchases = len(PURCHASES)
-    pending_orders = len([p for p in PURCHASES if p['status'] == 'Pending'])
-    received_orders = len([p for p in PURCHASES if p['status'] == 'Received'])
+    search   = request.args.get('search', '').lower()
+    status   = request.args.get('status', '')
+    supplier = request.args.get('supplier', '')
 
+    filtered = PURCHASES
+
+    if search:
+        filtered = [p for p in filtered
+                    if search in p['supplier'].lower()
+                    or search in p['status'].lower()
+                    or search in p['created_by'].lower()]
+    if status:
+        filtered = [p for p in filtered
+                    if p['status'] == status]
+    if supplier:
+        filtered = [p for p in filtered
+                    if p['supplier'] == supplier]
+
+    total_purchases = len(filtered)
+    pending_orders  = len([p for p in filtered
+                           if p['status'] == 'Pending'])
+    received_orders = len([p for p in filtered
+                           if p['status'] == 'Received'])
 
     return render_template('purchases.html',
         active          = 'purchases',
         page_title      = 'Purchases',
         current_date    = today(),
         low_stock_count = len(LOW_STOCK),
-        purchases       = PURCHASES,
+        purchases       = filtered,
         suppliers       = SUPPLIERS,
         products        = PRODUCTS,
         total_purchases = total_purchases,
         pending_orders  = pending_orders,
-                received_orders = received_orders
+        received_orders = received_orders,
+        selected_status   = status,
+        selected_supplier = supplier,
+        search_query      = search
     )
 
 @app.route('/purchases/add', methods=['POST'])
