@@ -1,5 +1,5 @@
 try:
-    from flask import Flask, render_template, request, redirect, session, url_for, jsonify
+    from flask import Flask, render_template, request, redirect, session, url_for, jsonify, flash
 except Exception as e:
     raise RuntimeError(
         "Missing dependency: Flask is not installed or cannot be resolved. "
@@ -479,27 +479,96 @@ def delete_category(id):
 
 @app.route('/supplier')
 def suppliers():
+    search_query = request.args.get('search', '').strip()
+    selected_rating = request.args.get('rating', '').strip()
+
+    filtered_suppliers = SUPPLIERS.copy()
+    if search_query:
+        sq = search_query.lower()
+        filtered_suppliers = [s for s in filtered_suppliers if sq in s['name'].lower()]
+
+    if selected_rating:
+        try:
+            rating_val = float(selected_rating)
+            filtered_suppliers = [s for s in filtered_suppliers if s.get('rating', 0) >= rating_val]
+        except ValueError:
+            # ignore invalid rating filter
+            pass
+
     return render_template('supplier.html',
-        active          = 'suppliers',
-        page_title      = 'Suppliers',
+        active          = 'supplier',
+        page_title      = 'Supplier',
         current_date    = today(),
         low_stock_count = len(LOW_STOCK),
-        suppliers       = SUPPLIERS
+        suppliers       = filtered_suppliers,
+        search_query    = search_query,
+        selected_rating = selected_rating
     )
 
 @app.route('/supplier/add', methods=['POST'])
 def add_supplier():
     # TODO: Replace with Oracle INSERT when DB is ready
+    name = request.form.get('name', '').strip()
+    phone = request.form.get('phone', '').strip()
+    email = request.form.get('email', '').strip()
+    address = request.form.get('address', '').strip()
+    rating_raw = request.form.get('rating', '').strip()
+    
+  
+
+    new_supplier = {
+        'id': len(SUPPLIERS) + 1,
+        'name': name,
+        'phone': phone,
+        'email': email,
+        'address': address,
+        'rating': float(rating_raw) if rating_raw != '' else 0.0
+    }
+    SUPPLIERS.append(new_supplier)    
+    flash(f'Supplier "{name}" added successfully.', 'success')
     return redirect('/supplier')
 
-@app.route('/supplier/edit/<int:id>', methods=['POST'])
+@app.route('/supplier/edit/<int:id>', methods=['GET', 'POST'])
 def edit_supplier(id):
     # TODO: Replace with Oracle UPDATE when DB is ready
-    return redirect('/supplier')
+    supplier = next((s for s in SUPPLIERS if s['id'] == id), None)
+    if not supplier:
+        flash(f'Supplier "{id}" not found.', 'danger')
+        return redirect('/supplier')
 
-@app.route('/supplier/delete/<int:id>')
+    if request.method == 'POST':
+        supplier['name'] = request.form.get('name', supplier.get('name'))
+        supplier['phone'] = request.form.get('phone', supplier.get('phone'))
+        supplier['email'] = request.form.get('email', supplier.get('email'))
+        supplier['address'] = request.form.get('address', supplier.get('address'))
+        rating_raw = request.form.get('rating', '')
+        try:
+            supplier['rating'] = float(rating_raw) if rating_raw != '' else supplier.get('rating', 0.0)
+        except ValueError:
+            supplier['rating'] = supplier.get('rating', 0.0)
+        flash(f'Supplier "{supplier["name"]}" updated successfully.', 'success')
+        return redirect('/supplier')
+
+    return render_template(
+        'edit_supplier.html', 
+        supplier = supplier,
+        active = 'supplier',
+        page_title = f'Edit Supplier - {supplier["name"]}',
+        current_date = today(),
+        low_stock_count = len(LOW_STOCK)
+        )
+
+@app.route('/supplier/delete/<int:id>', methods=['POST'])
 def delete_supplier(id):
     # TODO: Replace with Oracle DELETE when DB is ready
+    global SUPPLIERS
+    supplier = next((s for s in SUPPLIERS if s['id'] == id), None)
+    if not supplier:
+        flash(f'Supplier "{id}" not found.', 'danger')
+        return redirect('/supplier')
+
+    SUPPLIERS = [s for s in SUPPLIERS if s['id'] != id]
+    flash(f'Supplier "{supplier["name"]}" deleted successfully.', 'success')
     return redirect('/supplier')
 
 # ═══════════════════════════════════════════════════════════
@@ -508,27 +577,70 @@ def delete_supplier(id):
 
 @app.route('/users')
 def users():
+    # Get search parameter
+    search_query = request.args.get('search', '').strip()
+    
+    # Filter users
+    filtered_users = USERS.copy()
+    if search_query:
+        sq = search_query.lower()
+        filtered_users = [u for u in filtered_users 
+                         if sq in u['fullname'].lower() 
+                         or sq in u['username'].lower()]
+    
     return render_template('users.html',
-        active          = 'users',
-        page_title      = 'Users',
-        current_date    = today(),
-        low_stock_count = len(LOW_STOCK),
-        users           = USERS
+        active='users',
+        page_title='Users',
+        current_date=today(),
+        low_stock_count=len(LOW_STOCK),
+        users=filtered_users,
+        search_query=search_query
     )
 
 @app.route('/users/add', methods=['POST'])
 def add_user():
     # TODO: Replace with Oracle INSERT when DB is ready
+    fullname = request.form.get('fullname')
+    username = request.form.get('username')
+    role = request.form.get('role')
+    is_active = 1 if request.form.get('is_active') == '1' else 0
+    
+    new_user = {
+        'id': len(USERS) + 1,
+        'fullname': fullname,
+        'username': username,
+        'role': role,
+        'is_active': is_active,
+        'date_created': today()
+    }
+    USERS.append(new_user)
+    flash(f'User "{fullname}" added successfully!', 'success')
     return redirect('/users')
 
 @app.route('/users/edit/<int:id>', methods=['POST'])
 def edit_user(id):
     # TODO: Replace with Oracle UPDATE when DB is ready
+    user = next((u for u in USERS if u['id'] == id), None)
+    if user:
+        user['fullname'] = request.form.get('fullname', user['fullname'])
+        user['username'] = request.form.get('username', user['username'])
+        user['role'] = request.form.get('role', user['role'])
+        user['is_active'] = 1 if request.form.get('is_active') == '1' else user['is_active']
+        flash(f'User "{user["fullname"]}" updated successfully!', 'success')
+    else:
+        flash(f'User not found!', 'danger')
     return redirect('/users')
 
-@app.route('/users/toggle/<int:id>')
-def toggle_user(id):
-    # TODO: Replace with Oracle UPDATE when DB is ready
+@app.route('/users/delete/<int:id>', methods=['POST'])
+def delete_user(id):
+    # TODO: Replace with Oracle DELETE when DB is ready
+    global USERS
+    user = next((u for u in USERS if u['id'] == id), None)
+    if user:
+        USERS = [u for u in USERS if u['id'] != id]
+        flash(f'User "{user["fullname"]}" deleted successfully!', 'success')
+    else:
+        flash(f'User not found!', 'danger')
     return redirect('/users')
 
 # ═══════════════════════════════════════════════════════════
@@ -623,18 +735,160 @@ def cancel_purchase(id):
 
 @app.route('/stock-transactions')
 def stock_transactions():
+    # Get filter parameters
+    search = request.args.get('search', '')
+    txn_type = request.args.get('type', '')
+    date_from = request.args.get('date_from', '')
+    date_to = request.args.get('date_to', '')
+    page = request.args.get('page', 1, type=int)
+    
+    # Start with all transactions
+    filtered = TRANSACTIONS.copy()
+    
+    # Apply search filter
+    if search:
+        search_lower = search.lower()
+        filtered = [t for t in filtered 
+                   if search_lower in t['product'].lower()
+                   or search_lower in t.get('notes', '').lower()]
+    
+    # Apply type filter
+    if txn_type:
+        type_map = {
+            'IN': 'Stock In',
+            'OUT': 'Stock Out', 
+            'ADJ': 'Adjustment',
+            'RTN': 'Return',
+            'TRF': 'Transfer'
+        }
+        mapped_type = type_map.get(txn_type, txn_type)
+        filtered = [t for t in filtered if t['type'] == mapped_type]
+    
+    # Calculate summary
+    today_str = today()
+    summary = {
+        'total_transactions': len(TRANSACTIONS),
+        'stock_in_today': len([t for t in TRANSACTIONS if t['type'] == 'Stock In' and t['date'].startswith(today_str[:6])]),
+        'stock_out_today': len([t for t in TRANSACTIONS if t['type'] == 'Stock Out' and t['date'].startswith(today_str[:6])]),
+        'adjustments_today': len([t for t in TRANSACTIONS if t['type'] == 'Adjustment' and t['date'].startswith(today_str[:6])])
+    }
+    
+    # Prepare transactions for template
+    transactions = []
+    for t in filtered:
+        # Determine quantity sign
+        qty = t['quantity']
+        if t['type'] == 'Stock Out':
+            qty = -abs(qty)
+        
+        transactions.append({
+            'id': t['id'],
+            'reference': f'TXN-{t["id"]:04d}',
+            'created_at': t['date'],  # Will be handled in template
+            'product_name': t['product'],
+            'sku': f'SKU-{t["id"]:03d}',  # Generate from product or ID
+            'category': 'General',  # You can add category to your data
+            'transaction_type': 'IN' if t['type'] == 'Stock In' else ('OUT' if t['type'] == 'Stock Out' else 'ADJ'),
+            'qty_before': 0,  # You'd need stock history to calculate this
+            'quantity': abs(qty),
+            'qty_after': 0,  # You'd need stock history to calculate this
+            'warehouse': 'Main',
+            'user_name': t['performed_by'],
+            'notes': t.get('notes', ''),
+            'type_display': t['type']
+        })
+    
+    # Simple pagination
+    per_page = 20
+    total = len(transactions)
+    start = (page - 1) * per_page
+    end = start + per_page
+    paginated = transactions[start:end]
+    
+    pagination = {
+        'page': page,
+        'pages': (total + per_page - 1) // per_page,
+        'total': total,
+        'has_prev': page > 1,
+        'has_next': end < total,
+        'prev_num': page - 1,
+        'next_num': page + 1,
+        'first': start + 1 if total > 0 else 0,
+        'last': min(end, total)
+    }
+    
+    filters = {
+        'search': search,
+        'type': txn_type,
+        'date_from': date_from,
+        'date_to': date_to
+    }
+    
     return render_template('stock_transactions.html',
-        active          = 'stock',
-        page_title      = 'Stock Transactions',
-        current_date    = today(),
-        low_stock_count = len(LOW_STOCK),
-        transactions    = TRANSACTIONS,
-        products        = PRODUCTS
+        active='stock',
+        page_title='Stock Transactions',
+        current_date=today(),
+        low_stock_count=len(LOW_STOCK),
+        transactions=paginated,
+        products=PRODUCTS,
+        summary=summary,
+        filters=filters,
+        pagination=pagination
     )
 
-@app.route('/stock/adjust', methods=['POST'])
-def stock_adjust():
-    # TODO: INSERT into StockTransaction + UPDATE Product in Oracle
+@app.route('/stock/transaction/add', methods=['GET', 'POST'])
+def add_transaction():
+    if request.method == 'POST':
+        # TODO: Add transaction logic
+        flash('Transaction added successfully!', 'success')
+        return redirect('/stock-transactions')
+    return render_template('add_transaction.html',
+        active='stock',
+        page_title='Add Transaction',
+        current_date=today(),
+        low_stock_count=len(LOW_STOCK),
+        products=PRODUCTS
+    )
+
+@app.route('/stock/transaction/view/<int:id>')
+def view_transaction(id):
+    transaction = next((t for t in TRANSACTIONS if t['id'] == id), None)
+    if not transaction:
+        flash('Transaction not found!', 'danger')
+        return redirect('/stock-transactions')
+    return render_template('view_transaction.html',
+        active='stock',
+        page_title='View Transaction',
+        current_date=today(),
+        low_stock_count=len(LOW_STOCK),
+        transaction=transaction
+    )
+
+@app.route('/stock/transaction/edit/<int:id>', methods=['GET', 'POST'])
+def edit_transaction(id):
+    transaction = next((t for t in TRANSACTIONS if t['id'] == id), None)
+    if not transaction:
+        flash('Transaction not found!', 'danger')
+        return redirect('/stock-transactions')
+    
+    if request.method == 'POST':
+        # TODO: Update transaction logic
+        flash('Transaction updated successfully!', 'success')
+        return redirect('/stock-transactions')
+    
+    return render_template('edit_transaction.html',
+        active='stock',
+        page_title='Edit Transaction',
+        current_date=today(),
+        low_stock_count=len(LOW_STOCK),
+        transaction=transaction,
+        products=PRODUCTS
+    )
+
+@app.route('/stock/transactions/export')
+def export_transactions():
+    # TODO: Generate CSV export
+    flash('Export feature coming soon!', 'info')
     return redirect('/stock-transactions')
 
 # ═══════════════════════════════════════════════════════════
@@ -676,21 +930,100 @@ def low_stock():
 
 @app.route('/reports')
 def reports():
-    return render_template('reports.html',
-        active           = 'reports',
-        page_title       = 'Reports',
-        current_date     = today(),
-        low_stock_count  = len(LOW_STOCK),
-        sales_report     = SALES,
-        sales_total      = sum(s['total'] for s in SALES),
-        purchases_report = PURCHASES,
-        purchases_total  = sum(p['total'] for p in PURCHASES),
-        inventory        = PRODUCTS,
-        inventory_total  = round(sum(
-            p['stock_qty'] * p['cost_price'] for p in PRODUCTS
-        ), 2)
-    )
+    # Read filter values from URL
+    period    = request.args.get('period', 'this_month')
+    date_from = request.args.get('date_from', '')
+    date_to   = request.args.get('date_to', '')
 
+    return render_template('reports.html',
+        active          = 'reports',
+        page_title      = 'Reports',
+        current_date    = today(),
+        low_stock_count = len(LOW_STOCK),
+
+        # KPI strip
+        kpi = {
+            'total_revenue':   sum(s['total'] for s in SALES),
+            'total_purchases': sum(p['total'] for p in PURCHASES),
+            'gross_profit':    round(sum(s['total'] for s in SALES) -
+                               sum(p['total'] for p in PURCHASES), 2),
+            'profit_margin':   0,
+            'stock_value':     round(sum(
+                               p['stock_qty'] * p['cost_price']
+                               for p in PRODUCTS), 2),
+            'total_sku':       len(PRODUCTS),
+            'revenue_growth':  0,
+            'purchase_growth': 0,
+        },
+
+        # Sales tab
+        sales = {
+            'total_amount':       sum(s['total'] for s in SALES),
+            'total_orders':       len(SALES),
+            'avg_order_value':    round(
+                                  sum(s['total'] for s in SALES) /
+                                  len(SALES), 2) if SALES else 0,
+            'top_product':        'Coca Cola 500ml',
+            'top_product_qty':    50,
+            'total_returns':      0,
+            'return_count':       0,
+            'total_units':        sum(s['item_count'] for s in SALES),
+            'total_revenue':      sum(s['total'] for s in SALES),
+            'total_cogs':         0,
+            'total_gross_profit': 0,
+            'overall_margin':     0,
+            'items':              [],
+            'customers':          [],
+        },
+
+        # Purchases tab
+        purchases = {
+            'total_amount':         sum(p['total'] for p in PURCHASES),
+            'total_orders':         len(PURCHASES),
+            'total_units':          0,
+            'top_supplier':         'ABC Distributors',
+            'pending_orders':       len([p for p in PURCHASES
+                                    if p['status'] == 'Pending']),
+            'grand_units_ordered':  0,
+            'grand_units_received': 0,
+            'grand_total_cost':     sum(p['total'] for p in PURCHASES),
+            'items':                [],
+            'suppliers':            [],
+        },
+
+        # Inventory valuation tab
+        valuation = {
+            'total_value':        round(sum(
+                                  p['stock_qty'] * p['cost_price']
+                                  for p in PRODUCTS), 2),
+            'retail_value':       round(sum(
+                                  p['stock_qty'] * p['unit_price']
+                                  for p in PRODUCTS), 2),
+            'low_stock_count':    len(LOW_STOCK),
+            'dead_stock_count':   0,
+            'method':             'Weighted Average Cost (WAC)',
+            'as_at':              today(),
+            'total_qty':          sum(p['stock_qty'] for p in PRODUCTS),
+            'total_cost_value':   round(sum(
+                                  p['stock_qty'] * p['cost_price']
+                                  for p in PRODUCTS), 2),
+            'total_retail_value': round(sum(
+                                  p['stock_qty'] * p['unit_price']
+                                  for p in PRODUCTS), 2),
+            'in_stock_count':     len([p for p in PRODUCTS
+                                  if p['stock_qty'] > p['reorder_level']]),
+            'out_of_stock_count': len([p for p in PRODUCTS
+                                  if p['stock_qty'] == 0]),
+            'items':              [],
+        },
+
+        # Filters — now reads from URL so dropdowns remember selection
+        filters = {
+            'period':    period,
+            'date_from': date_from,
+            'date_to':   date_to,
+        },
+    )
 # ═══════════════════════════════════════════════════════════
 # RUN
 # ═══════════════════════════════════════════════════════════
