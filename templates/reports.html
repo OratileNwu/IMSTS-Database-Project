@@ -2,10 +2,663 @@
 
 {% block content %}
 <div class="container-fluid">
-    <div class="alert alert-info text-center p-5">
-        <i class="fas fa-chart-bar fa-3x mb-3 d-block"></i>
-        <h4>Reports Page</h4>
-        <p>This is a placeholder for the reports page.<br>Frontend team will implement the complete design here.</p>
+
+    {% set kpi = kpi | default({
+    'total_revenue': 0,
+    'revenue_growth': 0,
+    'total_purchases': 0,
+    'purchase_growth': 0,
+    'gross_profit': 0,
+    'profit_margin': 0,
+    'stock_value': 0,
+    'total_sku': 0
+    }) %}
+
+    <!-- Page Header -->
+    <div class="row mb-4 align-items-center">
+        <div class="col">
+            <h2 class="fw-bold mb-0">
+                <i class="fas fa-chart-bar me-2 text-primary"></i>Reports
+            </h2>
+            <small class="text-muted">Management summary — inventory, sales &amp; purchasing</small>
+        </div>
+        <div class="col-auto d-flex gap-2">
+            <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
+                <i class="fas fa-print me-1"></i> Print
+
+            </button>
+        </div>
     </div>
+
+    <!-- KPI Strip -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <p class="text-muted small mb-1">Total Revenue</p>
+                    <h4 class="fw-bold mb-0 text-success">
+                        R {{ kpi.total_revenue | default('0.00') }}
+                    </h4>
+                    <p class="text-muted small mt-1 mb-0">
+                        <i class="fas fa-arrow-up text-success"></i>
+                        {{ kpi.revenue_growth | default('0') }}% vs last month
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <p class="text-muted small mb-1">Total Purchases</p>
+                    <h4 class="fw-bold mb-0 text-primary">
+                        R{{ kpi.total_purchases | default('0.00') }}
+                    </h4>
+                    <p class="text-muted small mt-1 mb-0">
+                        <i class="fas fa-arrow-down text-danger"></i>
+                        {{ kpi.purchase_growth | default('0') }}% vs last month
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <p class="text-muted small mb-1">Gross Profit</p>
+                    <h4 class="fw-bold mb-0 text-info">
+                        R {{ kpi.gross_profit | default('0.00') }}
+                    </h4>
+                    <p class="text-muted small mt-1 mb-0">
+                        Margin: {{ kpi.profit_margin | default('0') }}%
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <p class="text-muted small mb-1">Stock Value</p>
+                    <h4 class="fw-bold mb-0 text-warning">
+                        R {{ kpi.stock_value | default('0.00') }}
+                    </h4>
+                    <p class="text-muted small mt-1 mb-0">
+                        {{ kpi.total_sku | default('0') }} active SKUs
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Date Range Filter (shared) -->
+    <!-- Date Range Filter (shared) -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body py-2">
+            <form method="GET" action="{{ url_for('reports') }}">
+                <div class="row g-2 align-items-end">
+                    <div class="col-auto">
+                        <label class="form-label small fw-semibold text-muted mb-1">Period</label>
+                        <select class="form-select form-select-sm bg-light" name="period">
+                            <option value="this_month" {% if filters.period =='this_month' %}selected{% endif %}>This Month</option>
+                            <option value="last_month" {% if filters.period =='last_month' %}selected{% endif %}>Last Month</option>
+                            <option value="this_quarter" {% if filters.period =='this_quarter' %}selected{% endif %}>This Quarter</option>
+                            <option value="this_year" {% if filters.period =='this_year' %}selected{% endif %}>This Year</option>
+                            <option value="custom" {% if filters.period =='custom' %}selected{% endif %}>Custom Range</option>
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <label class="form-label small fw-semibold text-muted mb-1">From</label>
+                        <input type="date" class="form-control form-control-sm bg-light" name="date_from"
+                               value="{{ filters.date_from | default('') }}">
+                    </div>
+                    <div class="col-auto">
+                        <label class="form-label small fw-semibold text-muted mb-1">To</label>
+                        <input type="date" class="form-control form-control-sm bg-light" name="date_to"
+                               value="{{ filters.date_to | default('') }}">
+                    </div>
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-primary btn-sm">
+                            <i class="fas fa-sync-alt me-1"></i> Apply
+                        </button>
+                    </div>
+
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ===================== TABS ===================== -->
+    <ul class="nav nav-tabs nav-tabs-bordered mb-0" id="reportTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active fw-semibold" id="sales-tab"
+                    data-bs-toggle="tab" data-bs-target="#sales"
+                    type="button" role="tab">
+                <i class="fas fa-cash-register me-2"></i>Sales Report
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link fw-semibold" id="purchase-tab"
+                    data-bs-toggle="tab" data-bs-target="#purchase"
+                    type="button" role="tab">
+                <i class="fas fa-shopping-cart me-2"></i>Purchase Report
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link fw-semibold" id="valuation-tab"
+                    data-bs-toggle="tab" data-bs-target="#valuation"
+                    type="button" role="tab">
+                <i class="fas fa-boxes me-2"></i>Inventory Valuation
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content border border-top-0 rounded-bottom shadow-sm bg-white"
+         id="reportTabsContent">
+
+
+        <!-- ============================================================
+             TAB 1: SALES REPORT
+        ============================================================ -->
+        <div class="tab-pane fade show active p-4" id="sales" role="tabpanel">
+
+            <!-- Sales Summary Row -->
+            <div class="row g-3 mb-4">
+                <div class="col-6 col-md-3">
+                    <div class="rounded-3 bg-success-subtle p-3 h-100">
+                        <p class="text-success small fw-semibold mb-1">Total Sales</p>
+                        <h5 class="fw-bold mb-0 text-success">
+                            R {{ sales.total_amount | default('0.00') }}
+                        </h5>
+                        <small class="text-muted">{{ sales.total_orders | default('0') }} orders</small>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="rounded-3 bg-primary-subtle p-3 h-100">
+                        <p class="text-primary small fw-semibold mb-1">Avg Order Value</p>
+                        <h5 class="fw-bold mb-0 text-primary">
+                            R {{ sales.avg_order_value | default('0.00') }}
+                        </h5>
+                        <small class="text-muted">Per transaction</small>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="rounded-3 bg-warning-subtle p-3 h-100">
+                        <p class="text-warning small fw-semibold mb-1">Top Product</p>
+                        <h6 class="fw-bold mb-0 text-dark">
+                            {{ sales.top_product | default('—') }}
+                        </h6>
+                        <small class="text-muted">
+                            {{ sales.top_product_qty | default('0') }} units sold
+                        </small>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="rounded-3 bg-danger-subtle p-3 h-100">
+                        <p class="text-danger small fw-semibold mb-1">Returns / Refunds</p>
+                        <h5 class="fw-bold mb-0 text-danger">
+                            R {{ sales.total_returns | default('0.00') }}
+                        </h5>
+                        <small class="text-muted">{{ sales.return_count | default('0') }} returns</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sales by Product Table -->
+            <h6 class="fw-bold mb-3 text-muted text-uppercase small">
+                <i class="fas fa-table me-1"></i> Sales Breakdown by Product
+            </h6>
+            <div class="table-responsive mb-4">
+                <table class="table table-hover align-middle table-bordered border-light">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="small text-muted fw-semibold text-uppercase">#</th>
+                            <th class="small text-muted fw-semibold text-uppercase">Product</th>
+                            <th class="small text-muted fw-semibold text-uppercase">SKU</th>
+                            <th class="small text-muted fw-semibold text-uppercase">Category</th>
+                            <th class="text-center small text-muted fw-semibold text-uppercase">Units Sold</th>
+                            <th class="text-end small text-muted fw-semibold text-uppercase">Unit Price</th>
+                            <th class="text-end small text-muted fw-semibold text-uppercase">Revenue</th>
+                            <th class="text-end small text-muted fw-semibold text-uppercase">COGS</th>
+                            <th class="text-end small text-muted fw-semibold text-uppercase">Gross Profit</th>
+                            <th class="text-center small text-muted fw-semibold text-uppercase">Margin %</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if sales['items'] %}
+                        {% for item in sales['items'] or [] %}
+                        <tr>
+                            <td class="text-muted small">{{ loop.index }}</td>
+                            <td class="fw-semibold small">{{ item.product_name | default('—') }}</td>
+                            <td><code class="small text-muted">{{ item.sku | default('—') }}</code></td>
+                            <td><span class="badge bg-light text-dark border">{{ item.category | default('—') }}</span></td>
+                            <td class="text-center fw-semibold">{{ item.units_sold | default('0') }}</td>
+                            <td class="text-end small">R {{ item.unit_price | default('0.00') }}</td>
+                            <td class="text-end fw-semibold text-success">R {{ item.revenue | default('0.00') }}</td>
+                            <td class="text-end small text-muted">R {{ item.cogs | default('0.00') }}</td>
+                            <td class="text-end fw-semibold text-primary">R {{ item.gross_profit | default('0.00') }}</td>
+                            <td class="text-center">
+                                {% set margin = item.margin | default(0) | float %}
+                                <span class="badge {% if margin >= 30 %}bg-success{% elif margin >= 10 %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+                                    {{ margin }}%
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% else %}
+                        <tr>
+                            <td colspan="10" class="text-center py-4 text-muted">
+                                <i class="fas fa-chart-line fa-2x mb-2 d-block"></i>
+                                No sales data available for the selected period.
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                    {% if sales['items'] %}
+                    <tfoot class="table-light fw-bold">
+                        <tr>
+                            <td colspan="4" class="text-end small">TOTALS</td>
+                            <td class="text-center">{{ sales.total_units | default('0') }}</td>
+                            <td></td>
+                            <td class="text-end text-success">R {{ sales.total_revenue | default('0.00') }}</td>
+                            <td class="text-end text-muted">R {{ sales.total_cogs | default('0.00') }}</td>
+                            <td class="text-end text-primary">R {{ sales.total_gross_profit | default('0.00') }}</td>
+                            <td class="text-center">{{ sales.overall_margin | default('0') }}%</td>
+                        </tr>
+                    </tfoot>
+                    {% endif %}
+                </table>
+            </div>
+
+            <!-- Sales by Customer -->
+            <h6 class="fw-bold mb-3 text-muted text-uppercase small">
+                <i class="fas fa-users me-1"></i> Top Customers
+            </h6>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle table-bordered border-light">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="small text-muted fw-semibold text-uppercase">#</th>
+                            <th class="small text-muted fw-semibold text-uppercase">Customer</th>
+                            <th class="small text-muted fw-semibold text-uppercase">Contact</th>
+                            <th class="text-center small text-muted fw-semibold text-uppercase">Orders</th>
+                            <th class="text-end small text-muted fw-semibold text-uppercase">Total Spent</th>
+                            <th class="small text-muted fw-semibold text-uppercase">Last Purchase</th>
+                            <th class="text-center small text-muted fw-semibold text-uppercase">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if sales.customers %}
+                        {% for cust in sales.customers %}
+                        <tr>
+                            <td class="text-muted small">{{ loop.index }}</td>
+                            <td class="fw-semibold small">{{ cust.name | default('—') }}</td>
+                            <td class="small text-muted">{{ cust.contact | default('—') }}</td>
+                            <td class="text-center">{{ cust.order_count | default('0') }}</td>
+                            <td class="text-end fw-semibold text-success">R {{ cust.total_spent | default('0.00') }}</td>
+                            <td class="small text-muted">{{ cust.last_purchase | default('—') }}</td>
+                            <td class="text-center">
+                                {% if cust.is_active %}
+                                <span class="badge bg-success-subtle text-success">Active</span>
+                                {% else %}
+                                <span class="badge bg-secondary-subtle text-secondary">Inactive</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center py-3 text-muted small">
+                                No customer data available.
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+
+        </div><!-- /sales tab -->
+        <!-- ============================================================
+             TAB 2: PURCHASE REPORT
+        ============================================================ -->
+        <div class="tab-pane fade p-4" id="purchase" role="tabpanel">
+
+            <!-- Purchase Summary Row -->
+            <div class="row g-3 mb-4">
+                <div class="col-6 col-md-3">
+                    <div class="rounded-3 bg-primary-subtle p-3 h-100">
+                        <p class="text-primary small fw-semibold mb-1">Total Purchased</p>
+                        <h5 class="fw-bold mb-0 text-primary">
+                            R {{ purchases.total_amount | default('0.00') }}
+                        </h5>
+                        <small class="text-muted">{{ purchases.total_orders | default('0') }} orders</small>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="rounded-3 bg-success-subtle p-3 h-100">
+                        <p class="text-success small fw-semibold mb-1">Units Received</p>
+                        <h5 class="fw-bold mb-0 text-success">
+                            {{ purchases.total_units | default('0') }}
+                        </h5>
+                        <small class="text-muted">Across all products</small>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="rounded-3 bg-warning-subtle p-3 h-100">
+                        <p class="text-warning small fw-semibold mb-1">Top Supplier</p>
+                        <h6 class="fw-bold mb-0 text-dark">
+                            {{ purchases.top_supplier | default('—') }}
+                        </h6>
+                        <small class="text-muted">Highest order value</small>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="rounded-3 bg-danger-subtle p-3 h-100">
+                        <p class="text-danger small fw-semibold mb-1">Pending Deliveries</p>
+                        <h5 class="fw-bold mb-0 text-danger">
+                            {{ purchases.pending_orders | default('0') }}
+                        </h5>
+                        <small class="text-muted">Orders awaiting receipt</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Purchases by Product -->
+            <h6 class="fw-bold mb-3 text-muted text-uppercase small">
+                <i class="fas fa-table me-1"></i> Purchases by Product
+            </h6>
+            <div class="table-responsive mb-4">
+                <table class="table table-hover align-middle table-bordered border-light">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="small text-muted fw-semibold text-uppercase">#</th>
+                            <th class="small text-muted fw-semibold text-uppercase">Product</th>
+                            <th class="small text-muted fw-semibold text-uppercase">SKU</th>
+                            <th class="small text-muted fw-semibold text-uppercase">Supplier</th>
+                            <th class="text-center small text-muted fw-semibold text-uppercase">Units Ordered</th>
+                            <th class="text-center small text-muted fw-semibold text-uppercase">Units Received</th>
+                            <th class="text-end small text-muted fw-semibold text-uppercase">Unit Cost</th>
+                            <th class="text-end small text-muted fw-semibold text-uppercase">Total Cost</th>
+                            <th class="small text-muted fw-semibold text-uppercase">Last PO Date</th>
+                            <th class="text-center small text-muted fw-semibold text-uppercase">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if purchases['items'] %}
+                        {% for item in purchases['items'] %}
+                        <tr>
+                            <td class="text-muted small">{{ loop.index }}</td>
+                            <td class="fw-semibold small">{{ item.product_name | default('—') }}</td>
+                            <td><code class="small text-muted">{{ item.sku | default('—') }}</code></td>
+                            <td class="small">{{ item.supplier | default('—') }}</td>
+                            <td class="text-center">{{ item.units_ordered | default('0') }}</td>
+                            <td class="text-center">
+                                {% set received = item.units_received | default(0) | int %}
+                                {% set ordered  = item.units_ordered  | default(0) | int %}
+                                <span class="{% if received < ordered %}text-warning fw-semibold{% else %}text-success fw-semibold{% endif %}">
+                                    {{ received }}
+                                </span>
+                            </td>
+                            <td class="text-end small">R {{ item.unit_cost | default('0.00') }}</td>
+                            <td class="text-end fw-semibold text-primary">R {{ item.total_cost | default('0.00') }}</td>
+                            <td class="small text-muted">{{ item.last_po_date | default('—') }}</td>
+                            <td class="text-center">
+                                {% if item.status == 'Received' %}
+                                <span class="badge bg-success-subtle text-success">Received</span>
+                                {% elif item.status == 'Partial' %}
+                                <span class="badge bg-warning-subtle text-warning">Partial</span>
+                                {% elif item.status == 'Pending' %}
+                                <span class="badge bg-info-subtle text-info">Pending</span>
+                                {% elif item.status == 'Cancelled' %}
+                                <span class="badge bg-danger-subtle text-danger">Cancelled</span>
+                                {% else %}
+                                <span class="badge bg-light text-muted">{{ item.status | default('—') }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% else %}
+                        <tr>
+                            <td colspan="10" class="text-center py-4 text-muted">
+                                <i class="fas fa-shopping-cart fa-2x mb-2 d-block"></i>
+                                No purchase data available for the selected period.
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                    {% if purchases['items'] %}
+                    <tfoot class="table-light fw-bold">
+                        <tr>
+                            <td colspan="4" class="text-end small">TOTALS</td>
+                            <td class="text-center">{{ purchases.grand_units_ordered | default('0') }}</td>
+                            <td class="text-center text-success">{{ purchases.grand_units_received | default('0') }}</td>
+                            <td></td>
+                            <td class="text-end text-primary">R {{ purchases.grand_total_cost | default('0.00') }}</td>
+                            <td colspan="2"></td>
+                        </tr>
+                    </tfoot>
+                    {% endif %}
+                </table>
+            </div>
+
+            <!-- Supplier Summary -->
+            <h6 class="fw-bold mb-3 text-muted text-uppercase small">
+                <i class="fas fa-truck me-1"></i> Supplier Summary
+            </h6>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle table-bordered border-light">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="small text-muted fw-semibold text-uppercase">#</th>
+                            <th class="small text-muted fw-semibold text-uppercase">Supplier</th>
+                            <th class="small text-muted fw-semibold text-uppercase">Contact</th>
+                            <th class="text-center small text-muted fw-semibold text-uppercase">Orders</th>
+                            <th class="text-end small text-muted fw-semibold text-uppercase">Total Value</th>
+                            <th class="text-center small text-muted fw-semibold text-uppercase">On-Time Delivery</th>
+                            <th class="small text-muted fw-semibold text-uppercase">Last Order</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if purchases.suppliers %}
+                        {% for sup in purchases.suppliers %}
+                        <tr>
+                            <td class="text-muted small">{{ loop.index }}</td>
+                            <td class="fw-semibold small">{{ sup.name | default('—') }}</td>
+                            <td class="small text-muted">{{ sup.contact | default('—') }}</td>
+                            <td class="text-center">{{ sup.order_count | default('0') }}</td>
+                            <td class="text-end fw-semibold text-primary">R {{ sup.total_value | default('0.00') }}</td>
+                            <td class="text-center">
+                                {% set rate = sup.on_time_rate | default(0) | float %}
+                                <div class="progress" style="height:8px;">
+                                    <div class="progress-bar
+                                         {% if rate >= 80 %}bg-success{% elif rate >= 50 %}bg-warning{% else %}bg-danger{% endif %}"
+                                        role="progressbar" style="width:{{ rate }}%">
+                                    </div>
+                                </div>
+                                <small class="text-muted">{{ rate }}%</small>
+                            </td>
+                            <td class="small text-muted">{{ sup.last_order | default('—') }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center py-3 text-muted small">
+                                No supplier data available.
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+
+        </div><!-- /purchase tab -->
+        <!-- ============================================================
+             TAB 3: INVENTORY VALUATION
+        ============================================================ -->
+        <div class="tab-pane fade p-4" id="valuation" role="tabpanel">
+
+            <!-- Valuation Summary Row -->
+            <div class="row g-3 mb-4">
+                <div class="col-6 col-md-3">
+                    <div class="rounded-3 bg-warning-subtle p-3 h-100">
+                        <p class="text-warning small fw-semibold mb-1">Total Stock Value</p>
+                        <h5 class="fw-bold mb-0">
+                            R {{ valuation.total_value | default('0.00') }}
+                        </h5>
+                        <small class="text-muted">At cost price</small>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="rounded-3 bg-success-subtle p-3 h-100">
+                        <p class="text-success small fw-semibold mb-1">Retail Value</p>
+                        <h5 class="fw-bold mb-0 text-success">
+                            R {{ valuation.retail_value | default('0.00') }}
+                        </h5>
+                        <small class="text-muted">At selling price</small>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="rounded-3 bg-danger-subtle p-3 h-100">
+                        <p class="text-danger small fw-semibold mb-1">Low Stock Items</p>
+                        <h5 class="fw-bold mb-0 text-danger">
+                            {{ valuation.low_stock_count | default('0') }}
+                        </h5>
+                        <small class="text-muted">Below reorder level</small>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="rounded-3 bg-secondary-subtle p-3 h-100">
+                        <p class="text-secondary small fw-semibold mb-1">Dead Stock</p>
+                        <h5 class="fw-bold mb-0 text-secondary">
+                            {{ valuation.dead_stock_count | default('0') }}
+                        </h5>
+                        <small class="text-muted">No movement in 90 days</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Valuation Method Note -->
+            <div class="alert alert-light border d-flex align-items-center gap-2 mb-4 py-2">
+                <i class="fas fa-info-circle text-primary"></i>
+                <small>
+                    Valuation method: <strong>{{ valuation.method | default('Weighted Average Cost (WAC)') }}</strong>.
+                    Report generated as at <strong>{{ valuation.as_at | default('today') }}</strong>.
+                </small>
+            </div>
+
+            <!-- Inventory Valuation Table -->
+            <h6 class="fw-bold mb-3 text-muted text-uppercase small">
+                <i class="fas fa-table me-1"></i> Stock Valuation by Product
+            </h6>
+            <div class="table-responsive mb-4">
+                <table class="table table-hover align-middle table-bordered border-light">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="small text-muted fw-semibold text-uppercase">#</th>
+                            <th class="small text-muted fw-semibold text-uppercase">Product</th>
+                            <th class="small text-muted fw-semibold text-uppercase">SKU</th>
+                            <th class="small text-muted fw-semibold text-uppercase">Category</th>
+                            <th class="small text-muted fw-semibold text-uppercase">Warehouse</th>
+                            <th class="text-center small text-muted fw-semibold text-uppercase">Qty on Hand</th>
+                            <th class="text-center small text-muted fw-semibold text-uppercase">Reorder Lvl</th>
+                            <th class="text-end small text-muted fw-semibold text-uppercase">Avg Cost</th>
+                            <th class="text-end small text-muted fw-semibold text-uppercase">Selling Price</th>
+                            <th class="text-end small text-muted fw-semibold text-uppercase">Cost Value</th>
+                            <th class="text-end small text-muted fw-semibold text-uppercase">Retail Value</th>
+                            <th class="text-center small text-muted fw-semibold text-uppercase">Stock Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if valuation['items'] %}
+                        {% for item in valuation['items'] %}
+                        <tr>
+                            <td class="text-muted small">{{ loop.index }}</td>
+                            <td class="fw-semibold small">{{ item.product_name | default('—') }}</td>
+                            <td><code class="small text-muted">{{ item.sku | default('—') }}</code></td>
+                            <td><span class="badge bg-light text-dark border">{{ item.category | default('—') }}</span></td>
+                            <td class="small">
+                                <i class="fas fa-warehouse text-muted me-1" style="font-size:0.7rem;"></i>
+                                {{ item.warehouse | default('Main') }}
+                            </td>
+                            <td class="text-center fw-bold">{{ item.qty_on_hand | default('0') }}</td>
+                            <td class="text-center text-muted small">{{ item.reorder_level | default('0') }}</td>
+                            <td class="text-end small">R {{ item.avg_cost | default('0.00') }}</td>
+                            <td class="text-end small">R {{ item.selling_price | default('0.00') }}</td>
+                            <td class="text-end fw-semibold">R {{ item.cost_value | default('0.00') }}</td>
+                            <td class="text-end fw-semibold text-success">R {{ item.retail_value | default('0.00') }}</td>
+                            <td class="text-center">
+                                {% set qty = item.qty_on_hand | default(0) | int %}
+                                {% set reorder = item.reorder_level | default(0) | int %}
+                                {% if qty == 0 %}
+                                <span class="badge bg-danger">Out of Stock</span>
+                                {% elif qty <= reorder %}
+                                <span class="badge bg-warning text-dark">Low Stock</span>
+                                {% elif item.is_dead_stock %}
+                                <span class="badge bg-secondary">Dead Stock</span>
+                                {% else %}
+                                <span class="badge bg-success">In Stock</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% else %}
+                        <tr>
+                            <td colspan="12" class="text-center py-4 text-muted">
+                                <i class="fas fa-boxes fa-2x mb-2 d-block"></i>
+                                No inventory valuation data available.
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                    {% if valuation['items'] %}
+                    <tfoot class="table-light fw-bold">
+                        <tr>
+                            <td colspan="5" class="text-end small">TOTALS</td>
+                            <td class="text-center">{{ valuation.total_qty | default('0') }}</td>
+                            <td colspan="3"></td>
+                            <td class="text-end">R {{ valuation.total_cost_value | default('0.00') }}</td>
+                            <td class="text-end text-success">R {{ valuation.total_retail_value | default('0.00') }}</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                    {% endif %}
+                </table>
+            </div>
+
+            <!-- Stock Status Summary -->
+            <h6 class="fw-bold mb-3 text-muted text-uppercase small">
+                <i class="fas fa-chart-pie me-1"></i> Stock Status Summary
+            </h6>
+            <div class="row g-3">
+                <div class="col-6 col-md-3">
+                    <div class="card border-0 bg-success-subtle text-center p-3">
+                        <h4 class="fw-bold text-success mb-0">{{ valuation.in_stock_count | default('0') }}</h4>
+                        <small class="text-success fw-semibold">In Stock</small>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card border-0 bg-warning-subtle text-center p-3">
+                        <h4 class="fw-bold text-warning mb-0">{{ valuation.low_stock_count | default('0') }}</h4>
+                        <small class="text-warning fw-semibold">Low Stock</small>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card border-0 bg-danger-subtle text-center p-3">
+                        <h4 class="fw-bold text-danger mb-0">{{ valuation.out_of_stock_count | default('0') }}</h4>
+                        <small class="text-danger fw-semibold">Out of Stock</small>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card border-0 bg-secondary-subtle text-center p-3">
+                        <h4 class="fw-bold text-secondary mb-0">{{ valuation.dead_stock_count | default('0') }}</h4>
+                        <small class="text-secondary fw-semibold">Dead Stock</small>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+        <!-- /valuation tab -->
+
+    </div>
+    <!-- /tab-content -->
 </div>
+<!-- /container-fluid -->
 {% endblock %}
+
