@@ -1,11 +1,115 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container-fluid">
-    <div class="alert alert-info text-center p-5">
-        <i class="fas fa-users fa-3x mb-3 d-block"></i>
-        <h4>Users Page</h4>
-        <p>This is a placeholder for the users management page.<br>Frontend team will implement the complete design here.</p>
-    </div>
+
+<!-- FLASH MESSAGES -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+<div class="alert alert-{{ category if category != 'message' else 'info' }} alert-dismissible fade show" role="alert">
+    <i class="fa {% if category == 'success' %}fa-check-circle{% elif category == 'danger' %}fa-exclamation-circle{% else %}fa-info-circle{% endif %} me-2"></i>
+    {{ message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>
-{% endblock %}
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<div class="container-fluid">
+
+    <h2 class="mb-4">User Management</h2>
+
+    <!-- Add User Form -->
+    <div class="card mb-4">
+        <div class="card-header">Add New User</div>
+        <div class="card-body">
+            <form method="POST">
+                <div class="row">
+                    <div class="col-md-3">
+                        <input type="text" name="fullname" class="form-control" placeholder="fullname" required>
+                    </div>
+                    <div class="col-md-3">
+                        <input type="text" name="username" class="form-control" placeholder="username" required>
+                    </div>
+                    <div class="col-md-3">
+                        <select name="role" class="form-select" required>
+                            <option value="">Select Role</option>
+                            <option value="Admin">Admin</option>
+                            <option value="Manager">Manager</option>
+                            <option value="Inventory Clerk">Inventory Clerk</option>
+                            <option value="Sales Cashier">Sales Cashier</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select name="is_active" class="form-select">
+                            <option value="1">Active</option>
+                            <option value="0">Inactive</option>
+                        </select>
+                    </div> <div class="col-md-1">
+                        <button type="submit" class="btn btn-primary w-100">Add</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!--search-->
+    <div class="card mb-3">
+        <div class="card-body">
+            <form method="GET">
+                <div class="row">
+                    <div class="col-md-10">
+                        <input type="text" name="search" class="form-control" placeholder="Search users by name or username..." value="{{ search_query }}">
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-success w-100">Search</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    <!--print buttons-->
+    <div class="mb-3 d-flex justify-content-end gap-2">
+        <button type="button" onclick="window.print()" class="btn btn-info">Print</button>
+    </div>
+    <!-- Users Table -->
+    <div class="card">
+        <div class="card-header">Users List</div>
+        <div class="card-body">
+            <table class="table table-bordered table-striped">
+                <thead>
+                    <tr>
+                        <th>fullname</th>
+                        <th>username</th>
+                        <th>role</th>
+                        <th>status</th>
+                        <th>actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td>{{ user.fullname }}</td>
+                        <td>{{ user.username }}</td>
+                        <td>{{ user.role }}</td>
+                        <td>
+                            {% if user.is_active == 1 %}
+                            <span class="badge bg-success">Active</span>
+                            {% else %}
+                            <span class="badge bg-danger">Inactive</span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            <a href="{{url_for('edit_user', id=user.id) }}" class="btn btn-primary btn-sm">Edit</a>
+                            <form method="POST" action="{{ url_for('delete_user', id=user.id) }}" style="display: inline-block;" onsubmit="return confirm('Are you sure you want to delete this user?');">
+                                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endblock %}
