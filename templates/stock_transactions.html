@@ -1,11 +1,377 @@
 {% extends "base.html" %}
 
 {% block content %}
+
+<!-- FLASH MESSAGES -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+<div class="alert alert-{{ category if category != 'message' else 'info' }} alert-dismissible fade show" role="alert">
+    <i class="fa {% if category == 'success' %}fa-check-circle{% elif category == 'danger' %}fa-exclamation-circle{% else %}fa-info-circle{% endif %} me-2"></i>
+    {{ message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
 <div class="container-fluid">
-    <div class="alert alert-info text-center p-5">
-        <i class="fas fa-exchange-alt fa-3x mb-3 d-block"></i>
-        <h4>Stock Transactions Page</h4>
-        <p>This is a placeholder for the stock transactions page.<br>Frontend team will implement the complete design here.</p>
+
+
+    <!-- Page Header -->
+    <div class="row mb-4 align-items-center">
+        <div class="col">
+            <h2 class="fw-bold mb-0">
+                <i class="fas fa-exchange-alt me-2 text-primary"></i>Stock Transactions
+            </h2>
+            <small class="text-muted">Live log of all stock movements</small>
+        </div>
+        <div class="col-auto d-flex gap-2">
+            <a href="{{ url_for('add_transaction') }}" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i> New Transaction
+            </a>
+            <a href="{{ url_for('export_transactions') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-download me-1"></i> Export
+            </a>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="text-muted small mb-1">Total Transactions</p>
+                            <h4 class="fw-bold mb-0">{{ summary.total_transactions | default('—') }}</h4>
+                        </div>
+                        <span class="badge bg-primary-subtle text-primary p-2 rounded-3">
+                            <i class="fas fa-list"></i>
+                        </span>
+                    </div>
+                    <p class="text-muted small mt-2 mb-0">All time</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="text-muted small mb-1">Stock In (Today)</p>
+                            <h4 class="fw-bold mb-0 text-success">+{{ summary.stock_in_today | default('0') }}</h4>
+                        </div>
+                        <span class="badge bg-success-subtle text-success p-2 rounded-3">
+                            <i class="fas fa-arrow-down"></i>
+                        </span>
+                    </div>
+                    <p class="text-muted small mt-2 mb-0">Units received</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="text-muted small mb-1">Stock Out (Today)</p>
+                            <h4 class="fw-bold mb-0 text-danger">-{{ summary.stock_out_today | default('0') }}</h4>
+                        </div>
+                        <span class="badge bg-danger-subtle text-danger p-2 rounded-3">
+                            <i class="fas fa-arrow-up"></i>
+                        </span>
+                    </div>
+                    <p class="text-muted small mt-2 mb-0">Units dispatched</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="text-muted small mb-1">Adjustments</p>
+                            <h4 class="fw-bold mb-0 text-warning">{{ summary.adjustments_today | default('0') }}</h4>
+                        </div>
+                        <span class="badge bg-warning-subtle text-warning p-2 rounded-3">
+                            <i class="fas fa-sliders-h"></i>
+                        </span>
+                    </div>
+                    <p class="text-muted small mt-2 mb-0">Manual corrections</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters & Search -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('stock_transactions') }}">
+
+                <div class="row g-2 align-items-end">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label small fw-semibold text-muted mb-1">Search</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-end-0">
+                                <i class="fas fa-search text-muted"></i>
+                            </span>
+                            <input type="text" class="form-control border-start-0 bg-light"
+                                   placeholder="Product name, SKU or ref…"
+                                   name="search" value="{{ filters.search | default('') }}">
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <label class="form-label small fw-semibold text-muted mb-1">Type</label>
+                        <select class="form-select bg-light" name="type">
+                            <option value="">All Types</option>
+                            <option value="IN" {% if filters.type == 'IN' %}selected{% endif %}>Stock In</option>
+                            <option value="OUT" {% if filters.type == 'OUT' %}selected{% endif %}>Stock Out</option>
+                            <option value="ADJ" {% if filters.type == 'ADJ' %}selected{% endif %}>Adjustment</option>
+                            <option value="RTN" {% if filters.type == 'RTN' %}selected{% endif %}>Return</option>
+                            <option value="TRF" {% if filters.type == 'TRF' %}selected{% endif %}>Transfer</option>
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <label class="form-label small fw-semibold text-muted mb-1">From</label>
+                        <input type="date" class="form-select bg-light" name="date_from"
+                               value="{{ filters.date_from | default('') }}">
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <label class="form-label small fw-semibold text-muted mb-1">To</label>
+                        <input type="date" class="form-select bg-light" name="date_to"
+                               value="{{ filters.date_to | default('') }}">
+                    </div>
+                    <div class="col-6 col-md-2 d-flex gap-2">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-filter me-1"></i> Filter
+                        </button>
+                        <a href="{{ url_for('stock_transactions') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-undo"></i>
+                        </a>
+                    </div>
+            </form>
+        </div>
+        </form>
     </div>
 </div>
+
+<!-- Transaction Log Table -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center py-3">
+        <h6 class="fw-bold mb-0">
+            <i class="fas fa-book-open me-2 text-muted"></i>Transaction Log
+        </h6>
+        <span class="badge bg-secondary-subtle text-secondary">
+            {{ transactions | length }} record(s)
+        </span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-secondary">
+                    <tr>
+                        <th class="ps-4 small fw-semibold text-uppercase">Ref #</th>
+                        <th class=" small fw-semibold text-uppercase">Date &amp; Time</th>
+                        <th class=" small fw-semibold text-uppercase">Product</th>
+                        <th class=" small fw-semibold text-uppercase">SKU</th>
+                        <th class=" small fw-semibold text-uppercase">Type</th>
+                        <th class="text-center small fw-semibold text-uppercase">Qty Before</th>
+                        <th class="text-center small fw-semibold text-uppercase">Movement</th>
+                        <th class="text-center small fw-semibold text-uppercase">Qty After</th>
+                        <th class=" small fw-semibold text-uppercase">Warehouse</th>
+                        <th class=" small fw-semibold text-uppercase">Performed By</th>
+                        <th class=" small fw-semibold text-uppercase">Notes</th>
+                        <th class="pe-4 small fw-semibold text-uppercase">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if transactions %}
+                    {% for txn in transactions %}
+                    <tr>
+                        <!-- Reference -->
+                        <td class="ps-4">
+                            <span class="fw-semibold text-primary small">
+                                #{{ txn.reference | default('TXN-' ~ loop.index) }}
+                            </span>
+                        </td>
+
+                        <!-- Date & Time -->
+                        <td>
+                            <span class="small">
+                                {{ txn.created_at.split()[0] if txn.created_at else '—' }}
+                            </span><br>
+                            <span class="text-muted" style="font-size:0.72rem;">
+                                {{ txn.created_at.split()[1] if txn.created_at and ' ' in txn.created_at else '' }}
+                            </span>
+                        </td>
+
+                        <!-- Product -->
+                        <td>
+                            <div class="fw-semibold small">{{ txn.product_name | default('—') }}</div>
+                            <div class="text-muted" style="font-size:0.72rem;">
+                                {{ txn.category | default('') }}
+                            </div>
+                        </td>
+
+                        <!-- SKU -->
+                        <td>
+                            <code class="small text-muted">{{ txn.sku | default('—') }}</code>
+                        </td>
+
+                        <!-- Transaction Type Badge -->
+                        <td>
+                            {% if txn.transaction_type == 'IN' %}
+                            <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                <i class="fas fa-arrow-down me-1"></i>Stock In
+                            </span>
+                            {% elif txn.transaction_type == 'OUT' %}
+                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle">
+                                <i class="fas fa-arrow-up me-1"></i>Stock Out
+                            </span>
+                            {% elif txn.transaction_type == 'ADJ' %}
+                            <span class="badge bg-warning-subtle text-warning border border-warning-subtle">
+                                <i class="fas fa-sliders-h me-1"></i>Adjustment
+                            </span>
+                            {% elif txn.transaction_type == 'RTN' %}
+                            <span class="badge bg-info-subtle text-info border border-info-subtle">
+                                <i class="fas fa-undo me-1"></i>Return
+                            </span>
+                            {% elif txn.transaction_type == 'TRF' %}
+                            <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">
+                                <i class="fas fa-random me-1"></i>Transfer
+                            </span>
+                            {% else %}
+                            <span class="badge bg-light text-muted">{{ txn.transaction_type | default('—') }}</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Qty Before -->
+                        <td class="text-center">
+                            <span class="small text-muted">{{ txn.qty_before | default('—') }}</span>
+                        </td>
+
+                        <!-- Movement (delta) -->
+                        <td class="text-center">
+                            {% set delta = txn.quantity | default(0) %}
+                            {% if txn.transaction_type in ['IN', 'RTN'] %}
+                            <span class="fw-bold text-success">+{{ delta }}</span>
+                            {% elif txn.transaction_type == 'OUT' %}
+                            <span class="fw-bold text-danger">-{{ delta }}</span>
+                            {% elif txn.transaction_type == 'ADJ' %}
+                            <span class="fw-bold text-warning">
+                                {% if delta >= 0 %}+{% endif %}{{ delta }}
+                            </span>
+                            {% else %}
+                            <span class="fw-bold text-muted">{{ delta }}</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Qty After -->
+                        <td class="text-center">
+                            <span class="fw-semibold small">{{ txn.qty_after | default('—') }}</span>
+                        </td>
+
+                        <!-- Warehouse / Location -->
+                        <td>
+                            <i class="fas fa-warehouse text-muted me-1" style="font-size:0.75rem;"></i>
+                            <span class="small">{{ txn.warehouse | default('Main') }}</span>
+                        </td>
+
+                        <!-- Performed By -->
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="rounded-circle bg-primary text-white d-flex align-items-center
+                                justify-content-center"
+                                     style="width:26px;height:26px;font-size:0.65rem;flex-shrink:0;">
+                                    {{ txn.user_name[:2].upper() if txn.user_name else 'SY' }}
+                                </div>
+                                <span class="small">{{ txn.user_name | default('System') }}</span>
+                            </div>
+                        </td>
+
+                        <!-- Notes -->
+                        <td>
+                            <span class="text-muted small" style="max-width:160px;display:block;
+                        overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                                  title="{{ txn.notes | default('') }}">
+                                {{ txn.notes | default('—') }}
+                            </span>
+                        </td>
+
+                        <!-- Actions -->
+                        <td class="pe-4">
+                            <div class="d-flex gap-1">
+                                <a href="{{ url_for('view_transaction', id=txn.id) }}"
+                                   class="btn btn-sm btn-outline-primary" title="View Details">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                {% if txn.transaction_type == 'ADJ' %}
+                                <a href="{{ url_for('edit_transaction', id=txn.id) }}"
+                                   class="btn btn-sm btn-outline-secondary" title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% else %}
+                    <!-- Empty State -->
+                    <tr>
+                        <td colspan="12" class="text-center py-5">
+                            <i class="fas fa-box-open fa-3x text-muted mb-3 d-block"></i>
+                            <h6 class="text-muted">No transactions found</h6>
+                            <p class="text-muted small mb-3">
+                                There are no stock movements matching your current filters.
+                            </p>
+                            <a href="{{ url_for('add_transaction') }}" class="btn btn-primary btn-sm">
+                                <i class="fas fa-plus me-1"></i> Record First Transaction
+                            </a>
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    
+    <!-- Pagination Footer -->
+    {% if pagination and pagination.pages > 1 %}
+    <div class="card-footer bg-white border-top d-flex justify-content-between align-items-center py-3">
+        <small class="text-muted">
+            Showing {{ pagination.first }} – {{ pagination.last }}
+            of {{ pagination.total }} transactions
+        </small>
+        <nav>
+            <ul class="pagination pagination-sm mb-0">
+                <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('stock_transactions', page=pagination.prev_num, search=filters.search, type=filters.type, date_from=filters.date_from, date_to=filters.date_to) }}">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                </li>
+                {% for p in range(1, pagination.pages + 1) %}
+                {% if p == 1 or p == pagination.pages or (p >= pagination.page - 2 and p <= pagination.page + 2) %}
+                <li class="page-item {% if p == pagination.page %}active{% endif %}">
+                    <a class="page-link" href="{{ url_for('stock_transactions', page=p, search=filters.search, type=filters.type, date_from=filters.date_from, date_to=filters.date_to) }}">{{ p }}</a>
+                </li>
+                {% elif p == pagination.page - 3 or p == pagination.page + 3 %}
+                <li class="page-item disabled"><span class="page-link">…</span></li>
+                {% endif %}
+                {% endfor %}
+                <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('stock_transactions', page=pagination.next_num, search=filters.search, type=filters.type, date_from=filters.date_from, date_to=filters.date_to) }}">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+
+</div>
+<!-- /card -->
+</div>
+<!-- /container-fluid -->
 {% endblock %}
